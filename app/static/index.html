@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shop Console</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">SC</div>
+        <div>
+          <h1>Shop Console</h1>
+          <p>FastAPI + MongoDB</p>
+        </div>
+      </div>
+      <div class="topbar-controls">
+        <label class="field role-field">
+          <span>Роль</span>
+          <select id="roleSelect">
+            <option value="admin">Администратор</option>
+            <option value="manager">Менеджер</option>
+            <option value="user">Пользователь</option>
+            <option value="guest">Гость</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Клиент</span>
+          <select id="customerSelect"></select>
+        </label>
+        <a class="docs-link" href="/docs">Swagger</a>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <nav class="sidebar" aria-label="Разделы">
+        <button class="nav-button active" data-view="catalogView">
+          <span class="icon icon-search" aria-hidden="true"></span>
+          Каталог
+        </button>
+        <button class="nav-button" data-view="cartView">
+          <span class="icon icon-cart" aria-hidden="true"></span>
+          Корзина
+          <span id="cartBadge" class="badge">0</span>
+        </button>
+        <button class="nav-button" data-view="ordersView">
+          <span class="icon icon-list" aria-hidden="true"></span>
+          Заказы
+        </button>
+        <button class="nav-button" data-view="reportsView">
+          <span class="icon icon-chart" aria-hidden="true"></span>
+          Отчеты
+        </button>
+      </nav>
+
+      <section class="workspace">
+        <section id="catalogView" class="view active">
+          <div class="section-head">
+            <div>
+              <h2>Каталог товаров</h2>
+              <p id="catalogCount">0 товаров</p>
+            </div>
+            <button id="refreshCatalogBtn" class="icon-button" title="Обновить каталог" aria-label="Обновить каталог">
+              <span class="icon icon-refresh" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <form id="searchForm" class="filter-bar">
+            <label class="field wide">
+              <span>Поиск</span>
+              <input id="queryInput" type="search" placeholder="Canon, Laser, HP">
+            </label>
+            <label class="field">
+              <span>Категория</span>
+              <select id="categorySelect"></select>
+            </label>
+            <label class="field">
+              <span>Производитель</span>
+              <input id="manufacturerInput" type="text" placeholder="HP">
+            </label>
+            <label class="field small">
+              <span>От</span>
+              <input id="minPriceInput" type="number" min="0" step="1">
+            </label>
+            <label class="field small">
+              <span>До</span>
+              <input id="maxPriceInput" type="number" min="0" step="1">
+            </label>
+            <label class="field small">
+              <span>Тип</span>
+              <select id="technologySelect">
+                <option value="">Любой</option>
+                <option value="Laser">Laser</option>
+                <option value="Inkjet">Inkjet</option>
+                <option value="LED">LED</option>
+                <option value="3D">3D</option>
+              </select>
+            </label>
+            <label class="toggle">
+              <input id="inStockInput" type="checkbox" checked>
+              <span>В наличии</span>
+            </label>
+            <button class="primary-button" type="submit">
+              <span class="icon icon-search" aria-hidden="true"></span>
+              Найти
+            </button>
+            <button id="resetFiltersBtn" class="secondary-button" type="button">Сброс</button>
+          </form>
+
+          <section id="productManagementPanel" class="management-panel" hidden>
+            <div class="management-head">
+              <div>
+                <h3>Управление товарами</h3>
+                <p id="productFormMode">Создание нового товара</p>
+              </div>
+              <button id="resetProductFormBtn" class="secondary-button" type="button">Новый товар</button>
+            </div>
+            <form id="productForm" class="product-form">
+              <input id="productIdInput" type="hidden">
+              <label class="field">
+                <span>Название</span>
+                <input id="productNameInput" type="text" minlength="3" required>
+              </label>
+              <label class="field">
+                <span>Производитель</span>
+                <input id="productManufacturerInput" type="text" required>
+              </label>
+              <label class="field">
+                <span>Категория</span>
+                <select id="productCategoryInput" required></select>
+              </label>
+              <label class="field small">
+                <span>Тип</span>
+                <select id="productTechnologyInput" required>
+                  <option value="Laser">Laser</option>
+                  <option value="Inkjet">Inkjet</option>
+                  <option value="LED">LED</option>
+                  <option value="3D">3D</option>
+                </select>
+              </label>
+              <label class="field small">
+                <span>Формат</span>
+                <select id="productPaperFormatInput" required>
+                  <option value="A4">A4</option>
+                  <option value="A3">A3</option>
+                  <option value="A5">A5</option>
+                </select>
+              </label>
+              <label class="field small">
+                <span>Цвета</span>
+                <input id="productColorsInput" type="number" min="1" value="1" required>
+              </label>
+              <label class="field small">
+                <span>Цена</span>
+                <input id="productPriceInput" type="number" min="0" step="0.01" required>
+              </label>
+              <label class="field small">
+                <span>Кол-во</span>
+                <input id="productQuantityInput" type="number" min="0" required>
+              </label>
+              <button class="primary-button" type="submit">
+                <span class="icon icon-check" aria-hidden="true"></span>
+                Сохранить
+              </button>
+            </form>
+          </section>
+
+          <div id="productGrid" class="product-grid"></div>
+        </section>
+
+        <section id="cartView" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Корзина клиента</h2>
+              <p id="cartTotalLine">Итого: 0</p>
+            </div>
+            <button id="refreshCartBtn" class="icon-button" title="Обновить корзину" aria-label="Обновить корзину">
+              <span class="icon icon-refresh" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="split-layout">
+            <div>
+              <div id="cartItems" class="list-panel"></div>
+            </div>
+            <form id="checkoutForm" class="checkout-panel">
+              <h3>Оформление</h3>
+              <label class="field">
+                <span>Адрес доставки</span>
+                <input id="deliveryAddressInput" type="text" value="Moscow, Stromynka st., 20" required>
+              </label>
+              <button class="primary-button full" type="submit">
+                <span class="icon icon-check" aria-hidden="true"></span>
+                Оформить заказ
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <section id="ordersView" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Заказы клиента</h2>
+              <p id="ordersCount">0 заказов</p>
+            </div>
+            <button id="refreshOrdersBtn" class="icon-button" title="Обновить заказы" aria-label="Обновить заказы">
+              <span class="icon icon-refresh" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div id="ordersList" class="order-list"></div>
+        </section>
+
+        <section id="reportsView" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Аналитика продаж</h2>
+              <p>Топ, клиенты, спрос и непроданные товары</p>
+            </div>
+            <button id="refreshReportsBtn" class="icon-button" title="Обновить отчеты" aria-label="Обновить отчеты">
+              <span class="icon icon-refresh" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="reports-grid">
+            <section class="report-block">
+              <div class="report-head">
+                <h3>Топ продаж</h3>
+                <label class="field tiny">
+                  <span>Мес.</span>
+                  <input id="topMonthsInput" type="number" min="1" max="36" value="3">
+                </label>
+              </div>
+              <div id="topSalesReport" class="report-list"></div>
+            </section>
+
+            <section class="report-block">
+              <div class="report-head">
+                <h3>Активные клиенты</h3>
+                <label class="field tiny">
+                  <span>N</span>
+                  <input id="minPurchasesInput" type="number" min="0" value="1">
+                </label>
+              </div>
+              <div id="activeCustomersReport" class="report-list"></div>
+            </section>
+
+            <section class="report-block">
+              <div class="report-head">
+                <h3>Спрос категорий</h3>
+                <div class="inline-fields">
+                  <input id="demandStartInput" type="date" value="2026-05-01" aria-label="Начало периода">
+                  <input id="demandEndInput" type="date" value="2026-05-31" aria-label="Конец периода">
+                </div>
+              </div>
+              <div id="categoryDemandReport" class="report-list"></div>
+            </section>
+
+            <section class="report-block">
+              <div class="report-head">
+                <h3>Не проданы в дату</h3>
+                <input id="unsoldDateInput" type="date" value="2026-05-07" aria-label="Дата">
+              </div>
+              <div id="unsoldProductsReport" class="report-list compact-list"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
