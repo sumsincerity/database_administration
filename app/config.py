@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     mongo_url: str = "mongodb://admin:password@localhost:27017"
     mongo_db_name: str = "shop"
 
+    postgres_host: str
+    postgres_port: int
+    postgres_db: str
+    postgres_user: str
+    postgres_password: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -165,3 +165,31 @@ class CategoryDemandOut(BaseModel):
     revenue: float
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class BranchCreate(BaseModel):
+    name: str
+    city: str
+
+
+class BranchOut(BaseModel):
+    id: int
+    name: str
+    city: str
+
+
+class EmployeeCreate(BaseModel):
+    first_name: str
+    last_name: str
+    position: str
+    email: str
+    branch_id: int
+
+
+class EmployeeOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    position: str
+    email: str
+    branch_id: int

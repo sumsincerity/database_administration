@@ -18,10 +18,11 @@ from app.schemas import (
     CartItemIn,
     CartItemOut,
     CartOut,
-    CategoryDemandOut, 
+    CategoryDemandOut,
     CategoryOut,
     CheckoutIn,
     CustomerOut,
+    EmployeeCreate,
     EmployeeOut,
     OrderOut,
     OrderProductOut,
@@ -30,8 +31,18 @@ from app.schemas import (
     ProductOut,
     ProductUpdate,
     TopSaleOut,
+    BranchOut,
+    BranchCreate
 )
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db import postgres_db
+from app.postgres_models import Base
+from app.postgres_models import Branch
+from app.postgres_models import Employee
+from app.db import engine
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -171,7 +182,12 @@ async def ensure_category_exists(db: AsyncIOMotorDatabase, category_id: ObjectId
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
     yield
+    
     await close_mongo_connection()
 
 
@@ -207,14 +223,6 @@ async def list_customers(
     return [serialize_customer(document) async for document in cursor]
 
 
-@app.get("/employees", response_model=list[EmployeeOut])
-async def list_employees(
-    db: Annotated[AsyncIOMotorDatabase, Depends(database)],
-) -> list[EmployeeOut]:
-    cursor = db.employees.find().sort([("lastName", 1), ("firstName", 1)])
-    return [serialize_employee(document) async for document in cursor]
-
-
 @app.get("/categories/{category_id}/products", response_model=list[ProductOut])
 async def list_products_by_category(
     category_id: str,
@@ -226,6 +234,16 @@ async def list_products_by_category(
         raise HTTPException(status_code=404, detail="Category not found")
 
     cursor = db.products.find({"categoryId": category_oid}).sort("name", 1)
+    return [serialize_product(document) async for document in cursor]
+
+
+@app.get("/products", response_model=list[ProductOut])
+async def list_products(
+    db: Annotated[AsyncIOMotorDatabase, Depends(database)],
+    limit: int = Query(default=100, ge=1, le=1000),
+    skip: int = Query(default=0, ge=0),
+) -> list[ProductOut]:
+    cursor = db.products.find().sort("name", 1).skip(skip).limit(limit)
     return [serialize_product(document) async for document in cursor]
 
 
@@ -635,3 +653,111 @@ async def unsold_products(
     )
     cursor = db.products.find({"_id": {"$nin": sold_product_ids}}).sort("name", 1)
     return [serialize_product(document) async for document in cursor]
+
+
+@app.get("/employees", response_model=list[EmployeeOut])
+async def get_employees(
+    db: Annotated[AsyncSession, Depends(postgres_db)],
+):
+    result = await db.execute(select(Employee))
+
+    employees = result.scalars().all()
+
+    return [
+        EmployeeOut(
+            id=e.id,
+            first_name=e.first_name,
+            last_name=e.last_name,
+            position=e.position,
+            email=e.email,
+            branch_id=e.branch_id,
+        )
+        for e in employees
+    ]
+
+
+@app.post("/employees", response_model=EmployeeOut)
+async def create_employee(
+    employee: EmployeeCreate,
+    db: Annotated[AsyncSession, Depends(postgres_db)],
+):
+    new_employee = Employee(
+        first_name=employee.first_name,
+        last_name=employee.last_name,
+        position=employee.position,
+        email=employee.email,
+        branch_id=employee.branch_id,
+    )
+
+    db.add(new_employee)
+
+    await db.commit()
+
+    await db.refresh(new_employee)
+
+    return EmployeeOut(
+        id=new_employee.id,
+        first_name=new_employee.first_name,
+        last_name=new_employee.last_name,
+        position=new_employee.position,
+        email=new_employee.email,
+        branch_id=new_employee.branch_id,
+    )
+
+
+@app.delete("/employees/{employee_id}")
+async def delete_employee(
+    employee_id: int,
+    db: Annotated[AsyncSession, Depends(postgres_db)],
+):
+    employee = await db.get(Employee, employee_id)
+
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    await db.delete(employee)
+
+    await db.commit()
+
+    return {"message": "Employee deleted"}
+
+
+@app.get("/branches", response_model=list[BranchOut])
+async def get_branches(
+    db: Annotated[AsyncSession, Depends(postgres_db)],
+):
+    result = await db.execute(select(Branch))
+
+    branches = result.scalars().all()
+
+    return [
+        BranchOut(
+            id=b.id,
+            name=b.name,
+            city=b.city,
+        )
+        for b in branches
+    ]
+
+
+@app.post("/branches", response_model=BranchOut)
+async def create_branch(
+    branch: BranchCreate,
+    db: Annotated[AsyncSession, Depends(postgres_db)],
+):
+    new_branch = Branch(
+        name=branch.name,
+        city=branch.city,
+    )
+
+    db.add(new_branch)
+
+    await db.commit()
+
+    await db.refresh(new_branch)
+
+    return BranchOut(
+        id=new_branch.id,
+        name=new_branch.name,
+        city=new_branch.city,
+    )

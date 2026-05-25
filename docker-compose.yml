@@ -1,16 +1,25 @@
 services:
   api:
+    image: mongodb_administration_api:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
-    container_name: mongodb_administration_api
+    env_file:
+      - .env
     environment:
-      MONGO_URL: ${MONGO_URL:-mongodb://admin:password@mongodb:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-shop}
+      - MONGO_URL=${MONGO_URL}
+      - MONGO_DB_NAME=${MONGO_DB_NAME}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "8000:8000"
     depends_on:
       mongodb:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - ./app:/app/app
@@ -18,27 +27,44 @@ services:
 
   mongodb:
     image: mongo:7
-    container_name: mongodb_administration_db
+    env_file:
+      - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-shop}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
       - ./docker/mongo-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "mongosh \"mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/admin\" --quiet --eval \"db.adminCommand('ping').ok\"",
-        ]
+      test: ["CMD-SHELL", "mongosh mongodb://admin:password@localhost:27017/admin --quiet --eval \"db.adminCommand('ping').ok\""]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
   mongodb_data:
+  postgres_data:
