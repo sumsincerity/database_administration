@@ -23,11 +23,6 @@ jobs:
 
       - name: Установка зависимостей
         run: |
-          python -m pip install --upgrade pip
-          # Вариант 1: если есть pyproject.toml / setup.py
-          pip install -e ".[dev]"
-          # Вариант 2: если используете requirements.txt
-          # pip install -r requirements.txt
           pip install pytest ruff build
 
       - name: Линтинг (Ruff)
