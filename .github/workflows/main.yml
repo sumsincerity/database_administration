@@ -23,13 +23,10 @@ jobs:
 
       - name: Установка зависимостей
         run: |
-          pip install ruff build
+          pip install ruff
 
       - name: Линтинг (Ruff)
         run: ruff check .
-
-      - name: Сборка пакета
-        run: python -m build
 
       - name: Публикация в GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
