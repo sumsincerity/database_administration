@@ -1,0 +1,122 @@
+replicaCount: 2
+
+image:
+  api:
+    repository: mongodb_administration_api
+    tag: latest
+    pullPolicy: IfNotPresent
+
+uvicorn:
+  workers: 2
+
+api:
+  service:
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# NodePort — удобно на Docker Desktop; в облаке можно ClusterIP + Ingress.
+exposure:
+  api:
+    type: ClusterIP
+    nodePort: 30080
+  grafana:
+    type: ClusterIP
+    nodePort: 30300
+  prometheus:
+    type: ClusterIP
+    nodePort: 30090
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+
+auth:
+  admin:
+    username: shop_admin
+    password: admin123
+  manager:
+    username: shop_manager
+    password: manager123
+  user:
+    username: shop_user
+    password: user123
+  guest:
+    username: shop_guest
+    password: guest123
+
+# Один Pod MongoDB (как в учебном practice-shop). Шардирование — только в Docker Compose.
+mongo:
+  image: mongo:7
+  rootUsername: admin
+  rootPassword: password
+  dbName: shop
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+postgres:
+  image: postgres:16
+  dbName: shop_postgres
+  user: postgres
+  password: postgres
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  retentionDays: 7
+  storageSize: 5Gi
+
+ingress:
+  enabled: false
+  className: ""
+  host: shop.local
+  path: /
+  tls:
+    enabled: false
+    secretName: ""
+
+networkPolicy:
+  enabled: true
+
+securityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  readOnlyRootFilesystem: true
+
+monitoring:
+  enabled: true
+  prometheus:
+    service:
+      port: 9090
+  grafana:
+    service:
+      port: 3000
+    adminUser: admin
+    adminPassword: admin

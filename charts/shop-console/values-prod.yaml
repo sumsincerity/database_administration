@@ -1,0 +1,37 @@
+replicaCount: 2
+
+backup:
+  enabled: true
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: ""
+  host: shop.example.com
+  path: /
+  tls:
+    enabled: true
+    secretName: shop-tls
+
+mongo:
+  rootPassword: "CHANGE_ME_PROD_MONGO_ROOT_PASSWORD"
+
+postgres:
+  password: "CHANGE_ME_PROD_POSTGRES_PASSWORD"
+
+# Credentials for HTTP Basic auth. Replace in production.
+auth:
+  admin:
+    password: "CHANGE_ME_PROD_ADMIN_PASSWORD"
+  manager:
+    password: "CHANGE_ME_PROD_MANAGER_PASSWORD"
+  user:
+    password: "CHANGE_ME_PROD_USER_PASSWORD"
+  guest:
+    password: "CHANGE_ME_PROD_GUEST_PASSWORD"
+

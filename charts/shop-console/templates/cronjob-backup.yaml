@@ -1,0 +1,70 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "shop-console.fullname" . }}-backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: {{ .Values.postgres.image }}
+              env:
+                - name: MONGO_INITDB_ROOT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "shop-console.fullname" . }}-secrets
+                      key: MONGO_INITDB_ROOT_USERNAME
+                - name: MONGO_INITDB_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "shop-console.fullname" . }}-secrets
+                      key: MONGO_INITDB_ROOT_PASSWORD
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "shop-console.fullname" . }}-secrets
+                      key: POSTGRES_USER
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "shop-console.fullname" . }}-secrets
+                      key: POSTGRES_PASSWORD
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "shop-console.fullname" . }}-secrets
+                      key: POSTGRES_DB
+              command:
+                - /bin/bash
+                - -ec
+                - |
+                  set -euo pipefail
+                  apt-get update -qq && apt-get install -y -qq --no-install-recommends mongodb-database-tools
+                  STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+                  DIR="/backups/${STAMP}"
+                  mkdir -p "${DIR}/mongo" "${DIR}/postgres"
+                  mongodump \
+                    --host="{{ include "shop-console.mongoServiceName" . }}" \
+                    --port=27017 \
+                    --username="${MONGO_INITDB_ROOT_USERNAME}" \
+                    --password="${MONGO_INITDB_ROOT_PASSWORD}" \
+                    --authenticationDatabase=admin \
+                    --out="${DIR}/mongo"
+                  PGPASSWORD="${POSTGRES_PASSWORD}" pg_dump \
+                    -h {{ include "shop-console.postgresServiceName" . }} \
+                    -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc \
+                    -f "${DIR}/postgres/shop.dump"
+                  ln -sfn "${DIR}" /backups/latest
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ include "shop-console.fullname" . }}-backup
+{{- end }}

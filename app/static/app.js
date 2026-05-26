@@ -6,6 +6,7 @@ const ROLE_RULES = {
     canUpdateOrders: true,
     canViewReports: true,
     canManageProducts: true,
+    canManageStaff: true,
   },
   manager: {
     label: "Менеджер",
@@ -14,6 +15,7 @@ const ROLE_RULES = {
     canUpdateOrders: true,
     canViewReports: true,
     canManageProducts: true,
+    canManageStaff: true,
   },
   user: {
     label: "Пользователь",
@@ -22,6 +24,7 @@ const ROLE_RULES = {
     canUpdateOrders: false,
     canViewReports: false,
     canManageProducts: false,
+    canManageStaff: false,
   },
   guest: {
     label: "Гость",
@@ -30,17 +33,23 @@ const ROLE_RULES = {
     canUpdateOrders: false,
     canViewReports: false,
     canManageProducts: false,
+    canManageStaff: false,
   },
 };
 
+const AUTH_STORAGE_KEY = "shop_console_auth";
+
 const state = {
-  role: "admin",
+  auth: null,
   categories: [],
   customers: [],
   selectedCustomerId: null,
   products: [],
   cart: null,
   orders: [],
+  branches: [],
+  selectedBranchId: null,
+  branchStructure: null,
 };
 
 const els = {};
@@ -48,12 +57,20 @@ const els = {};
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   bindEvents();
-  loadInitialData();
+  bootstrapAuth();
 });
 
 function cacheElements() {
   Object.assign(els, {
-    roleSelect: document.querySelector("#roleSelect"),
+    loginOverlay: document.querySelector("#loginOverlay"),
+    loginForm: document.querySelector("#loginForm"),
+    loginUsername: document.querySelector("#loginUsername"),
+    loginPassword: document.querySelector("#loginPassword"),
+    loginError: document.querySelector("#loginError"),
+    userPanel: document.querySelector("#userPanel"),
+    userNameLabel: document.querySelector("#userNameLabel"),
+    userRoleLabel: document.querySelector("#userRoleLabel"),
+    logoutBtn: document.querySelector("#logoutBtn"),
     customerSelect: document.querySelector("#customerSelect"),
     categorySelect: document.querySelector("#categorySelect"),
     searchForm: document.querySelector("#searchForm"),
@@ -99,6 +116,36 @@ function cacheElements() {
     activeCustomersReport: document.querySelector("#activeCustomersReport"),
     categoryDemandReport: document.querySelector("#categoryDemandReport"),
     unsoldProductsReport: document.querySelector("#unsoldProductsReport"),
+    refreshStaffBtn: document.querySelector("#refreshStaffBtn"),
+    branchSelect: document.querySelector("#branchSelect"),
+    branchForm: document.querySelector("#branchForm"),
+    branchNameInput: document.querySelector("#branchNameInput"),
+    branchCityInput: document.querySelector("#branchCityInput"),
+    branchAddressInput: document.querySelector("#branchAddressInput"),
+    branchPhoneInput: document.querySelector("#branchPhoneInput"),
+    branchOpenedInput: document.querySelector("#branchOpenedInput"),
+    branchStructurePanel: document.querySelector("#branchStructurePanel"),
+    branchSummary: document.querySelector("#branchSummary"),
+    staffEmptyHint: document.querySelector("#staffEmptyHint"),
+    departmentsList: document.querySelector("#departmentsList"),
+    storeZonesList: document.querySelector("#storeZonesList"),
+    employeesList: document.querySelector("#employeesList"),
+    departmentForm: document.querySelector("#departmentForm"),
+    storeZoneForm: document.querySelector("#storeZoneForm"),
+    employeeForm: document.querySelector("#employeeForm"),
+    departmentNameInput: document.querySelector("#departmentNameInput"),
+    departmentDescInput: document.querySelector("#departmentDescInput"),
+    zoneNameInput: document.querySelector("#zoneNameInput"),
+    zoneTypeInput: document.querySelector("#zoneTypeInput"),
+    zoneFloorInput: document.querySelector("#zoneFloorInput"),
+    zoneAreaInput: document.querySelector("#zoneAreaInput"),
+    empFirstNameInput: document.querySelector("#empFirstNameInput"),
+    empLastNameInput: document.querySelector("#empLastNameInput"),
+    empPositionInput: document.querySelector("#empPositionInput"),
+    empEmailInput: document.querySelector("#empEmailInput"),
+    empPhoneInput: document.querySelector("#empPhoneInput"),
+    empDepartmentInput: document.querySelector("#empDepartmentInput"),
+    empHiredInput: document.querySelector("#empHiredInput"),
     toast: document.querySelector("#toast"),
   });
 }
@@ -108,15 +155,20 @@ function bindEvents() {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
 
-  els.roleSelect.addEventListener("change", async () => {
-    state.role = els.roleSelect.value;
-    applyRoleRules();
-    renderProducts();
-    renderCart();
-    renderOrders();
-    await loadRoleData();
-    showToast(`Роль: ${currentRole().label}`);
+  els.loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await login(els.loginUsername.value.trim(), els.loginPassword.value);
   });
+
+  document.querySelectorAll("[data-demo-user]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      els.loginUsername.value = button.dataset.demoUser;
+      els.loginPassword.value = button.dataset.demoPass;
+      await login(button.dataset.demoUser, button.dataset.demoPass);
+    });
+  });
+
+  els.logoutBtn.addEventListener("click", () => logout());
 
   els.customerSelect.addEventListener("change", async () => {
     state.selectedCustomerId = els.customerSelect.value;
@@ -154,22 +206,164 @@ function bindEvents() {
     event.preventDefault();
     await checkout();
   });
+
+  els.refreshStaffBtn.addEventListener("click", loadStaffData);
+  els.branchSelect.addEventListener("change", async () => {
+    state.selectedBranchId = els.branchSelect.value ? Number(els.branchSelect.value) : null;
+    await loadBranchStructure();
+  });
+  els.branchForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await createBranch();
+  });
+  els.departmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await createDepartment();
+  });
+  els.storeZoneForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await createStoreZone();
+  });
+  els.employeeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await createEmployee();
+  });
+}
+
+function bootstrapAuth() {
+  const saved = readStoredAuth();
+  if (saved) {
+    login(saved.username, saved.password, { silent: true }).catch(() => showLogin());
+    return;
+  }
+  showLogin();
+}
+
+function readStoredAuth() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.username || !parsed?.password) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeAuth(username, password) {
+  sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ username, password }));
+}
+
+function clearStoredAuth() {
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function showLogin(message = "") {
+  document.body.classList.add("login-locked");
+  els.loginOverlay.hidden = false;
+  els.userPanel.hidden = true;
+  if (message) {
+    els.loginError.hidden = false;
+    els.loginError.textContent = message;
+  } else {
+    els.loginError.hidden = true;
+    els.loginError.textContent = "";
+  }
+}
+
+function hideLogin() {
+  document.body.classList.remove("login-locked");
+  els.loginOverlay.hidden = true;
+  els.loginError.hidden = true;
+  els.loginError.textContent = "";
+}
+
+function renderUserPanel() {
+  if (!state.auth) {
+    els.userPanel.hidden = true;
+    return;
+  }
+  els.userPanel.hidden = false;
+  els.userNameLabel.textContent = state.auth.username;
+  els.userRoleLabel.textContent = currentRole().label;
+}
+
+async function login(username, password, options = {}) {
+  const { silent = false } = options;
+
+  state.auth = { username, password, role: null };
+  let profile;
+  try {
+    profile = await api("/auth/me");
+  } catch (error) {
+    state.auth = null;
+    if (!silent) {
+      showLogin(formatAuthError(error));
+    }
+    throw error;
+  }
+
+  state.auth = { username, password, role: profile.role };
+  storeAuth(username, password);
+  hideLogin();
+  renderUserPanel();
+  applyRoleRules();
+
+  if (!silent) {
+    showToast(`Вход выполнен: ${currentRole().label}`);
+  }
+
+  await loadInitialData();
+}
+
+function logout() {
+  state.auth = null;
+  state.categories = [];
+  state.customers = [];
+  state.selectedCustomerId = null;
+  state.products = [];
+  state.cart = null;
+  state.orders = [];
+  state.branches = [];
+  state.selectedBranchId = null;
+  state.branchStructure = null;
+  clearStoredAuth();
+  showLogin();
+  renderUserPanel();
+  els.productGrid.innerHTML = "";
+  els.catalogCount.textContent = "0 товаров";
+  setActiveView("catalogView");
+}
+
+function formatAuthError(error) {
+  const message = error?.message || "Ошибка входа";
+  if (message.includes("Invalid credentials") || message.includes("401")) {
+    return "Неверный логин или пароль";
+  }
+  if (message.includes("403")) {
+    return "Недостаточно прав";
+  }
+  return message;
 }
 
 async function loadInitialData() {
+  if (!state.auth?.role) return;
   try {
-    const [categories, customers] = await Promise.all([
-      api("/categories"),
-      api("/customers"),
-    ]);
-
-    state.categories = categories;
-    state.customers = customers;
-    state.selectedCustomerId = customers[0]?.id ?? null;
-
+    state.categories = await api("/categories");
     renderCategoryOptions();
-    renderCustomerOptions();
     applyRoleRules();
+
+    if (currentRole().canUseCart || currentRole().canViewOrders) {
+      state.customers = await api("/customers");
+      state.selectedCustomerId = state.customers[0]?.id ?? null;
+      renderCustomerOptions();
+    } else {
+      state.customers = [];
+      state.selectedCustomerId = null;
+      els.customerSelect.innerHTML = "";
+    }
+
     await Promise.all([searchProducts(), loadRoleData()]);
   } catch (error) {
     showToast(error.message, true);
@@ -183,20 +377,38 @@ async function loadRoleData() {
   if (role.canUseCart) tasks.push(loadCart());
   if (role.canViewOrders) tasks.push(loadOrders());
   if (role.canViewReports) tasks.push(loadReports());
+  if (role.canManageStaff) tasks.push(loadStaffData());
 
   await Promise.all(tasks);
 }
 
 async function api(path, options = {}) {
+  if (!state.auth) {
+    throw new Error("Требуется авторизация");
+  }
+
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Basic ${btoa(`${state.auth.username}:${state.auth.password}`)}`,
+      ...(options.headers || {}),
+    },
     ...options,
   });
 
   let payload = null;
   const text = await response.text();
   if (text) {
-    payload = JSON.parse(text);
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { detail: text };
+    }
+  }
+
+  if (response.status === 401) {
+    logout();
+    throw new Error("Сессия истекла. Войдите снова.");
   }
 
   if (!response.ok) {
@@ -208,7 +420,8 @@ async function api(path, options = {}) {
 }
 
 function currentRole() {
-  return ROLE_RULES[state.role];
+  const role = state.auth?.role || "guest";
+  return ROLE_RULES[role] || ROLE_RULES.guest;
 }
 
 function applyRoleRules() {
@@ -220,6 +433,7 @@ function applyRoleRules() {
   toggleNav("cartView", role.canUseCart);
   toggleNav("ordersView", role.canViewOrders);
   toggleNav("reportsView", role.canViewReports);
+  toggleNav("staffView", role.canManageStaff);
 
   if (!role.canManageProducts) resetProductForm();
 
@@ -239,6 +453,7 @@ function isViewAllowed(viewId) {
   if (viewId === "cartView") return role.canUseCart;
   if (viewId === "ordersView") return role.canViewOrders;
   if (viewId === "reportsView") return role.canViewReports;
+  if (viewId === "staffView") return role.canManageStaff;
   return true;
 }
 
@@ -471,16 +686,79 @@ function renderCart() {
   }
 
   els.cartItems.innerHTML = products
-    .map((item) => `
+    .map((item) => {
+      const productId = item.productId || item.product_id;
+      return `
       <div class="cart-item">
         <div>
           <h3>${escapeHtml(item.name)}</h3>
           <div class="muted">${item.quantity} шт. x ${formatMoney(item.price)}</div>
         </div>
-        <strong>${formatMoney(item.subtotal)}</strong>
+        <div class="cart-item-side">
+          <strong>${formatMoney(item.subtotal)}</strong>
+          <div class="cart-item-actions">
+            <label class="field tiny cart-qty-field">
+              <span>Кол-во</span>
+              <input
+                type="number"
+                min="1"
+                value="${item.quantity}"
+                aria-label="Количество"
+                onchange="updateCartQuantity('${productId}', this.value)"
+              >
+            </label>
+            <button
+              class="secondary-button danger"
+              type="button"
+              onclick="removeFromCart('${productId}')"
+            >Удалить</button>
+          </div>
+        </div>
       </div>
-    `)
+    `;
+    })
     .join("");
+}
+
+async function removeFromCart(productId) {
+  if (!currentRole().canUseCart || !state.selectedCustomerId) return;
+
+  try {
+    state.cart = await api(
+      `/customers/${state.selectedCustomerId}/cart/items/${productId}`,
+      { method: "DELETE" },
+    );
+    renderCart();
+    showToast("Товар удалён из корзины");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function updateCartQuantity(productId, rawQuantity) {
+  if (!currentRole().canUseCart || !state.selectedCustomerId) return;
+
+  const quantity = Number.parseInt(rawQuantity, 10);
+  if (!Number.isFinite(quantity) || quantity < 1) {
+    showToast("Укажите количество не меньше 1", true);
+    renderCart();
+    return;
+  }
+
+  try {
+    state.cart = await api(
+      `/customers/${state.selectedCustomerId}/cart/items/${productId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ quantity }),
+      },
+    );
+    renderCart();
+    showToast("Количество обновлено");
+  } catch (error) {
+    showToast(error.message, true);
+    await loadCart();
+  }
 }
 
 async function checkout() {
@@ -665,6 +943,228 @@ function setActiveView(viewId) {
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("active", view.id === targetView);
   });
+
+  if (targetView === "staffView" && currentRole().canManageStaff) {
+    loadStaffData().catch((error) => showToast(error.message, true));
+  }
+}
+
+async function loadStaffData() {
+  if (!currentRole().canManageStaff) return;
+
+  state.branches = await api("/branches");
+  renderBranchOptions();
+
+  if (state.selectedBranchId && !state.branches.some((b) => b.id === state.selectedBranchId)) {
+    state.selectedBranchId = null;
+  }
+
+  if (!state.selectedBranchId && state.branches.length) {
+    state.selectedBranchId = state.branches[0].id;
+    els.branchSelect.value = String(state.selectedBranchId);
+  }
+
+  await loadBranchStructure();
+}
+
+function renderBranchOptions() {
+  const options = [
+    '<option value="">— выберите филиал —</option>',
+    ...state.branches.map(
+      (branch) =>
+        `<option value="${branch.id}">${escapeHtml(branch.name)} — ${escapeHtml(branch.city)}</option>`,
+    ),
+  ];
+  els.branchSelect.innerHTML = options.join("");
+  if (state.selectedBranchId) {
+    els.branchSelect.value = String(state.selectedBranchId);
+  }
+}
+
+async function loadBranchStructure() {
+  if (!state.selectedBranchId) {
+    state.branchStructure = null;
+    els.branchStructurePanel.hidden = true;
+    els.staffEmptyHint.hidden = false;
+    return;
+  }
+
+  state.branchStructure = await api(`/branches/${state.selectedBranchId}/structure`);
+  els.branchStructurePanel.hidden = false;
+  els.staffEmptyHint.hidden = true;
+  renderBranchStructure();
+}
+
+function renderBranchStructure() {
+  const data = state.branchStructure;
+  if (!data) return;
+
+  const branch = data.branch;
+  els.branchSummary.innerHTML = `
+    <div>
+      <strong>${escapeHtml(branch.name)}</strong>
+      <span class="pill">${escapeHtml(branch.city)}</span>
+    </div>
+    <p class="muted">${escapeHtml(branch.address || "—")} · ${escapeHtml(branch.phone || "—")}${
+      branch.opened_at ? ` · с ${escapeHtml(branch.opened_at)}` : ""
+    }</p>
+  `;
+
+  els.departmentsList.innerHTML = renderStaffRows(
+    data.departments,
+    (d) => `<strong>${escapeHtml(d.name)}</strong><span class="muted">${escapeHtml(d.description || "—")}</span>`,
+    "Отделов пока нет",
+  );
+
+  els.storeZonesList.innerHTML = renderStaffRows(
+    data.store_zones,
+    (z) =>
+      `<strong>${escapeHtml(z.name)}</strong><span class="muted">${escapeHtml(z.zone_type)} · этаж ${z.floor_number}${
+        z.area_sqm != null ? ` · ${z.area_sqm} м²` : ""
+      }</span>`,
+    "Зон пока нет",
+  );
+
+  els.employeesList.innerHTML = data.employees.length
+    ? data.employees
+        .map((e) => {
+          const dept = data.departments.find((d) => d.id === e.department_id);
+          const deptLabel = dept ? dept.name : "—";
+          return `
+            <div class="staff-row staff-row-actions">
+              <div>
+                <strong>${escapeHtml(e.first_name)} ${escapeHtml(e.last_name)}</strong>
+                <span class="muted">${escapeHtml(e.position)} · ${escapeHtml(e.email)}</span>
+                <span class="muted">Отдел: ${escapeHtml(deptLabel)} · с ${escapeHtml(e.hired_at)}</span>
+              </div>
+              <button class="secondary-button danger" type="button" onclick="deleteEmployee(${e.id})">Удалить</button>
+            </div>
+          `;
+        })
+        .join("")
+    : '<div class="muted">Сотрудников пока нет</div>';
+
+  els.empDepartmentInput.innerHTML = [
+    '<option value="">Без отдела</option>',
+    ...data.departments.map((d) => `<option value="${d.id}">${escapeHtml(d.name)}</option>`),
+  ].join("");
+}
+
+function renderStaffRows(items, renderItem, emptyText) {
+  if (!items.length) {
+    return `<div class="muted">${emptyText}</div>`;
+  }
+  return items
+    .map(
+      (item) => `
+        <div class="staff-row">${renderItem(item)}</div>
+      `,
+    )
+    .join("");
+}
+
+async function createBranch() {
+  const payload = {
+    name: els.branchNameInput.value.trim(),
+    city: els.branchCityInput.value.trim(),
+    address: els.branchAddressInput.value.trim(),
+    phone: els.branchPhoneInput.value.trim(),
+  };
+  const opened = els.branchOpenedInput.value;
+  if (opened) payload.opened_at = opened;
+
+  const branch = await api("/branches", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  els.branchForm.reset();
+  state.selectedBranchId = branch.id;
+  showToast(`Филиал «${branch.name}» создан`);
+  await loadStaffData();
+}
+
+async function createDepartment() {
+  if (!state.selectedBranchId) {
+    showToast("Сначала выберите филиал", true);
+    return;
+  }
+
+  await api("/departments", {
+    method: "POST",
+    body: JSON.stringify({
+      branch_id: state.selectedBranchId,
+      name: els.departmentNameInput.value.trim(),
+      description: els.departmentDescInput.value.trim(),
+    }),
+  });
+
+  els.departmentForm.reset();
+  showToast("Отдел добавлен");
+  await loadBranchStructure();
+}
+
+async function createStoreZone() {
+  if (!state.selectedBranchId) {
+    showToast("Сначала выберите филиал", true);
+    return;
+  }
+
+  const areaRaw = els.zoneAreaInput.value.trim();
+  const payload = {
+    branch_id: state.selectedBranchId,
+    name: els.zoneNameInput.value.trim(),
+    floor_number: Number(els.zoneFloorInput.value) || 1,
+    zone_type: els.zoneTypeInput.value,
+  };
+  if (areaRaw) payload.area_sqm = Number(areaRaw);
+
+  await api("/store-zones", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  els.storeZoneForm.reset();
+  els.zoneFloorInput.value = "1";
+  showToast("Зона добавлена");
+  await loadBranchStructure();
+}
+
+async function createEmployee() {
+  if (!state.selectedBranchId) {
+    showToast("Сначала выберите филиал", true);
+    return;
+  }
+
+  const deptVal = els.empDepartmentInput.value;
+  const hired = els.empHiredInput.value;
+  const payload = {
+    first_name: els.empFirstNameInput.value.trim(),
+    last_name: els.empLastNameInput.value.trim(),
+    position: els.empPositionInput.value.trim(),
+    email: els.empEmailInput.value.trim(),
+    phone: els.empPhoneInput.value.trim(),
+    branch_id: state.selectedBranchId,
+    department_id: deptVal ? Number(deptVal) : null,
+  };
+  if (hired) payload.hired_at = hired;
+
+  await api("/employees", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  els.employeeForm.reset();
+  showToast("Сотрудник добавлен");
+  await loadBranchStructure();
+}
+
+async function deleteEmployee(employeeId) {
+  if (!confirm("Удалить сотрудника?")) return;
+
+  await api(`/employees/${employeeId}`, { method: "DELETE" });
+  showToast("Сотрудник удалён");
+  await loadBranchStructure();
 }
 
 function showToast(message, isError = false) {
@@ -707,6 +1207,9 @@ function escapeHtml(value) {
 }
 
 window.addToCart = addToCart;
+window.removeFromCart = removeFromCart;
+window.updateCartQuantity = updateCartQuantity;
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
 window.updateOrderStatus = updateOrderStatus;
+window.deleteEmployee = deleteEmployee;

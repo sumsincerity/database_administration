@@ -1,0 +1,23 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shop-console.fullname" . }}-grafana
+  labels:
+    app.kubernetes.io/name: {{ include "shop-console.name" . }}
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.exposure.grafana.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "shop-console.name" . }}
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.monitoring.grafana.service.port }}
+      targetPort: 3000
+      {{- if and (eq .Values.exposure.grafana.type "NodePort") .Values.exposure.grafana.nodePort }}
+      nodePort: {{ .Values.exposure.grafana.nodePort }}
+      {{- end }}
+{{- end }}

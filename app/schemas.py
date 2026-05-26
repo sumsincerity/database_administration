@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -67,19 +67,14 @@ class CustomerOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class EmployeeOut(BaseModel):
-    id: str
-    first_name: str = Field(alias="firstName")
-    last_name: str = Field(alias="lastName")
-    position: str
-    email: str
-    phone: str | None = None
+class CartItemIn(BaseModel):
+    product_id: str = Field(alias="productId")
+    quantity: int = Field(gt=0)
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-class CartItemIn(BaseModel):
-    product_id: str = Field(alias="productId")
+class CartItemUpdate(BaseModel):
     quantity: int = Field(gt=0)
 
     model_config = ConfigDict(populate_by_name=True)
@@ -170,12 +165,55 @@ class CategoryDemandOut(BaseModel):
 class BranchCreate(BaseModel):
     name: str
     city: str
+    address: str = ""
+    phone: str = ""
+    opened_at: date | None = None
 
 
 class BranchOut(BaseModel):
     id: int
     name: str
     city: str
+    address: str
+    phone: str
+    opened_at: date | None = None
+
+
+class DepartmentCreate(BaseModel):
+    branch_id: int
+    name: str
+    description: str = ""
+
+
+class DepartmentOut(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    description: str
+
+
+class StoreZoneCreate(BaseModel):
+    branch_id: int
+    name: str
+    floor_number: int = 1
+    zone_type: str
+    area_sqm: float | None = None
+
+
+class StoreZoneOut(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    floor_number: int
+    zone_type: str
+    area_sqm: float | None = None
+
+
+class BranchStructureOut(BaseModel):
+    branch: BranchOut
+    departments: list[DepartmentOut]
+    store_zones: list[StoreZoneOut]
+    employees: list["EmployeeOut"]
 
 
 class EmployeeCreate(BaseModel):
@@ -183,7 +221,10 @@ class EmployeeCreate(BaseModel):
     last_name: str
     position: str
     email: str
+    phone: str = ""
     branch_id: int
+    department_id: int | None = None
+    hired_at: date | None = None
 
 
 class EmployeeOut(BaseModel):
@@ -192,4 +233,11 @@ class EmployeeOut(BaseModel):
     last_name: str
     position: str
     email: str
+    phone: str
     branch_id: int
+    department_id: int | None = None
+    hired_at: date
+    is_active: bool
+
+
+BranchStructureOut.model_rebuild()

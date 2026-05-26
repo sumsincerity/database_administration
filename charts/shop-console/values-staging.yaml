@@ -1,0 +1,33 @@
+replicaCount: 2
+
+ingress:
+  enabled: true
+  host: shop-staging.local
+  path: /
+  tls:
+    enabled: false
+    secretName: ""
+
+mongo:
+  rootUsername: admin
+  rootPassword: password-staging
+
+postgres:
+  user: postgres
+  password: postgres-staging
+
+# Keep API Basic auth credentials stable across environments (or override as needed).
+auth:
+  admin:
+    username: shop_admin
+    password: admin123
+  manager:
+    username: shop_manager
+    password: manager123
+  user:
+    username: shop_user
+    password: user123
+  guest:
+    username: shop_guest
+    password: guest123
+

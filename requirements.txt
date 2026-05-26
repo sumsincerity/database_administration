@@ -5,3 +5,4 @@ pydantic-settings==2.9.1
 sqlalchemy
 asyncpg
 psycopg2-binary
+prometheus-client

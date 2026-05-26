@@ -1,0 +1,23 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shop-console.fullname" . }}-prometheus
+  labels:
+    app.kubernetes.io/name: {{ include "shop-console.name" . }}
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.exposure.prometheus.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "shop-console.name" . }}
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.monitoring.prometheus.service.port }}
+      targetPort: 9090
+      {{- if and (eq .Values.exposure.prometheus.type "NodePort") .Values.exposure.prometheus.nodePort }}
+      nodePort: {{ .Values.exposure.prometheus.nodePort }}
+      {{- end }}
+{{- end }}

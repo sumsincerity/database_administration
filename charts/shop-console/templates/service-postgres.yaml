@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shop-console.postgresServiceName" . }}
+  labels:
+    {{- include "shop-console.postgresLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+  selector:
+    {{- include "shop-console.postgresLabels" . | nindent 4 }}
+

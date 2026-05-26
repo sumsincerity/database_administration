@@ -333,3 +333,4 @@ db.createUser({ user: "shop_admin", pwd: "admin123", roles: [{ role: "shopAdminR
 db.createUser({ user: "shop_manager", pwd: "manager123", roles: [{ role: "shopManagerRole", db: dbName }] });
 db.createUser({ user: "shop_user", pwd: "user123", roles: [{ role: "shopUserRole", db: dbName }] });
 db.createUser({ user: "shop_guest", pwd: "guest123", roles: [{ role: "shopGuestRole", db: dbName }] });
+

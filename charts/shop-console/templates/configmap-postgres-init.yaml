@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shop-console.fullname" . }}-postgres-init
+data:
+  01-init.sql: |-
+{{ .Files.Get "files/postgres/01-init.sql" | indent 4 }}
+

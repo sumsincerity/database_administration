@@ -1,0 +1,53 @@
+replicaCount: 2
+
+hpa:
+  enabled: false
+
+backup:
+  enabled: false
+
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+# NodePort — открыть API и мониторинг без port-forward (Docker Desktop).
+exposure:
+  api:
+    type: NodePort
+    nodePort: 30080
+  grafana:
+    type: NodePort
+    nodePort: 30300
+  prometheus:
+    type: NodePort
+    nodePort: 30090
+
+mongo:
+  rootUsername: admin
+  rootPassword: password
+  dbName: shop
+  persistence:
+    enabled: false
+
+postgres:
+  user: postgres
+  password: postgres
+  dbName: shop_postgres
+  persistence:
+    enabled: false
+
+auth:
+  admin:
+    username: shop_admin
+    password: admin123
+  manager:
+    username: shop_manager
+    password: manager123
+  user:
+    username: shop_user
+    password: user123
+  guest:
+    username: shop_guest
+    password: guest123

@@ -13,19 +13,17 @@
         <div class="brand-mark" aria-hidden="true">SC</div>
         <div>
           <h1>Shop Console</h1>
-          <p>FastAPI + MongoDB</p>
+          <p>FastAPI · MongoDB · PostgreSQL</p>
         </div>
       </div>
       <div class="topbar-controls">
-        <label class="field role-field">
-          <span>Роль</span>
-          <select id="roleSelect">
-            <option value="admin">Администратор</option>
-            <option value="manager">Менеджер</option>
-            <option value="user">Пользователь</option>
-            <option value="guest">Гость</option>
-          </select>
-        </label>
+        <div id="userPanel" class="user-panel" hidden>
+          <div class="user-meta">
+            <strong id="userNameLabel">—</strong>
+            <span id="userRoleLabel" class="pill">—</span>
+          </div>
+          <button id="logoutBtn" class="secondary-button" type="button">Выйти</button>
+        </div>
         <label class="field compact">
           <span>Клиент</span>
           <select id="customerSelect"></select>
@@ -52,6 +50,10 @@
         <button class="nav-button" data-view="reportsView">
           <span class="icon icon-chart" aria-hidden="true"></span>
           Отчеты
+        </button>
+        <button class="nav-button" data-view="staffView">
+          <span class="icon icon-users" aria-hidden="true"></span>
+          Персонал
         </button>
       </nav>
 
@@ -266,9 +268,147 @@
             </section>
           </div>
         </section>
+
+        <section id="staffView" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Персонал и филиалы</h2>
+              <p id="staffSubtitle">PostgreSQL — структура магазинов и сотрудники</p>
+            </div>
+            <button id="refreshStaffBtn" class="icon-button" title="Обновить" aria-label="Обновить персонал">
+              <span class="icon icon-refresh" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="staff-toolbar">
+            <label class="field">
+              <span>Филиал</span>
+              <select id="branchSelect">
+                <option value="">— выберите филиал —</option>
+              </select>
+            </label>
+          </div>
+
+          <section class="management-panel">
+            <div class="management-head">
+              <div>
+                <h3>Новый филиал</h3>
+                <p>Добавление записи в таблицу branches</p>
+              </div>
+            </div>
+            <form id="branchForm" class="staff-form-row">
+              <label class="field">
+                <span>Название</span>
+                <input id="branchNameInput" type="text" required>
+              </label>
+              <label class="field">
+                <span>Город</span>
+                <input id="branchCityInput" type="text" required>
+              </label>
+              <label class="field wide">
+                <span>Адрес</span>
+                <input id="branchAddressInput" type="text">
+              </label>
+              <label class="field">
+                <span>Телефон</span>
+                <input id="branchPhoneInput" type="text">
+              </label>
+              <label class="field">
+                <span>Открыт</span>
+                <input id="branchOpenedInput" type="date">
+              </label>
+              <button class="primary-button" type="submit">Добавить филиал</button>
+            </form>
+          </section>
+
+          <div id="branchStructurePanel" class="staff-structure" hidden>
+            <div id="branchSummary" class="branch-summary"></div>
+
+            <div class="staff-columns">
+              <section class="staff-card">
+                <h3>Отделы</h3>
+                <div id="departmentsList" class="staff-list"></div>
+                <form id="departmentForm" class="staff-mini-form">
+                  <input id="departmentNameInput" type="text" placeholder="Название отдела" required>
+                  <input id="departmentDescInput" type="text" placeholder="Описание">
+                  <button class="secondary-button" type="submit">+ Отдел</button>
+                </form>
+              </section>
+
+              <section class="staff-card">
+                <h3>Зоны магазина</h3>
+                <div id="storeZonesList" class="staff-list"></div>
+                <form id="storeZoneForm" class="staff-mini-form">
+                  <input id="zoneNameInput" type="text" placeholder="Название зоны" required>
+                  <select id="zoneTypeInput" required>
+                    <option value="sales">sales — продажи</option>
+                    <option value="warehouse">warehouse — склад</option>
+                    <option value="service">service — сервис</option>
+                    <option value="office">office — офис</option>
+                  </select>
+                  <input id="zoneFloorInput" type="number" min="1" value="1" title="Этаж">
+                  <input id="zoneAreaInput" type="number" min="0" step="0.1" placeholder="м²">
+                  <button class="secondary-button" type="submit">+ Зона</button>
+                </form>
+              </section>
+
+              <section class="staff-card staff-card-wide">
+                <h3>Сотрудники</h3>
+                <div id="employeesList" class="staff-list"></div>
+                <form id="employeeForm" class="staff-employee-form">
+                  <input id="empFirstNameInput" type="text" placeholder="Имя" required>
+                  <input id="empLastNameInput" type="text" placeholder="Фамилия" required>
+                  <input id="empPositionInput" type="text" placeholder="Должность" required>
+                  <input id="empEmailInput" type="email" placeholder="Email" required>
+                  <input id="empPhoneInput" type="text" placeholder="Телефон">
+                  <select id="empDepartmentInput">
+                    <option value="">Без отдела</option>
+                  </select>
+                  <input id="empHiredInput" type="date">
+                  <button class="primary-button" type="submit">Добавить сотрудника</button>
+                </form>
+              </section>
+            </div>
+          </div>
+
+          <div id="staffEmptyHint" class="empty-state">
+            Выберите филиал или создайте новый, чтобы увидеть отделы, зоны и персонал.
+          </div>
+        </section>
       </section>
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <div id="loginOverlay" class="login-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
+      <form id="loginForm" class="login-card">
+        <div class="login-brand">
+          <div class="brand-mark" aria-hidden="true">SC</div>
+          <div>
+            <h2 id="loginTitle">Вход в Shop Console</h2>
+            <p>HTTP Basic — те же учётные записи, что и в API</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Логин</span>
+          <input id="loginUsername" type="text" name="username" autocomplete="username" required>
+        </label>
+        <label class="field">
+          <span>Пароль</span>
+          <input id="loginPassword" type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <p id="loginError" class="login-error" hidden></p>
+        <button class="primary-button full" type="submit">Войти</button>
+        <div class="demo-logins">
+          <span>Быстрый вход (демо):</span>
+          <div class="demo-login-row">
+            <button type="button" class="secondary-button" data-demo-user="shop_admin" data-demo-pass="admin123">Админ</button>
+            <button type="button" class="secondary-button" data-demo-user="shop_manager" data-demo-pass="manager123">Менеджер</button>
+            <button type="button" class="secondary-button" data-demo-user="shop_user" data-demo-pass="user123">Пользователь</button>
+            <button type="button" class="secondary-button" data-demo-user="shop_guest" data-demo-pass="guest123">Гость</button>
+          </div>
+        </div>
+      </form>
+    </div>
   </body>
 </html>
