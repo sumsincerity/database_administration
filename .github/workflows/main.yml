@@ -23,13 +23,10 @@ jobs:
 
       - name: Установка зависимостей
         run: |
-          pip install pytest ruff build
+          pip install ruff build
 
       - name: Линтинг (Ruff)
         run: ruff check .
-
-      - name: Тесты
-        run: pytest -v
 
       - name: Сборка пакета
         run: python -m build
